@@ -35,8 +35,8 @@
 #include <assert.h>
 #include <libgeom.h>
 
-#include "/usr/src/sbin/geom/core/geom.h"
-#include "/usr/src/sbin/geom/misc/subr.h"
+#include "core/geom.h"
+#include "misc/subr.h"
 
 uint32_t lib_version = G_LIB_VERSION;
 uint32_t version = 1;

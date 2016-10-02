@@ -67,3 +67,4 @@ opt_cam.h
 opt_inet.h
 machine
 @
+export_syms
