@@ -42,6 +42,14 @@
 #define G_DEDUPE_CLASS_NAME       "DEDUPE"
 static MALLOC_DEFINE(M_GDEDUPE, "gdedupe data", "GEOM_DEDUPE Data");
 
+SYSCTL_DECL(_kern_geom);
+static SYSCTL_NODE(_kern_geom, OID_AUTO, dedupe, CTLFLAG_RW, 0,
+    "GEOM_DEDUPE stuff");
+static u_int g_dedupe_debug = 0;
+SYSCTL_UINT(_kern_geom_dedupe, OID_AUTO, debug, CTLFLAG_RWTUN, &g_dedupe_debug, 0,
+    "Debug level");
+    
+    
 static int g_dedupe_destroy(struct g_geom *gp, boolean_t force);
 static struct g_geom *g_dedupe_taste(struct g_class *mp, 
     struct g_provider *pp, int flags __unused);
@@ -63,17 +71,18 @@ static int g_dedupe_access(struct g_provider *gp, int dr, int dw, int de);
 static void
 g_dedupe_init(struct g_class *cp)
 {
-    printf("Entering g_dedupe_init");
+    G_DEDUPE_DEBUG(2, "Entering g_dedupe_init");
 }
 
-static struct g_geom *
-g_dedupe_create(struct g_class *mp, struct g_provider *pp,
-    const struct g_dedupe_metadata *md, u_int type)
+static void
+g_dedupe_create(struct gctl_req *req, struct g_class *mp)
 {
+    struct g_dedupe_metadata md;
     struct g_dedupe_softc *sc;
     struct g_geom *gp;          /* This is us, an instance of a geom class */
     struct g_provider *newpp;   /* This is us, a provider of gdedupe */
     struct g_consumer *cp;      /* This is us, a consumer of the parent provider (pp) */
+    struct g_provider *pp;          /* This is the parent provider */
     
     /* 1. Validate metadata in *md
      * 2. Create geom (gp)
@@ -90,12 +99,34 @@ g_dedupe_create(struct g_class *mp, struct g_provider *pp,
     cp = NULL;
     
     /* 1 */
+    const char *name = gctl_get_asciiparam(req, "arg0");
+    if(name == NULL) {
+        gctl_error(req, "Invalid gdedupe name");
+		return;
+    }
     
+    strlcpy(md.md_name, name, sizeof(md.md_name));
+    strlcpy(md.md_magic, G_DEDUPE_MAGIC, sizeof(md.md_magic));
+    md.md_version = G_DEDUPE_VERSION;
     
-    printf("Creating device %s", md->md_name);
+    /* Validate and find parent provider */
+    name = gctl_get_asciiparam(req, "arg1");
+        if(name == NULL) {
+        gctl_error(req, "Invalid geom provider name");
+		return;
+    }
     
+    pp = g_provider_by_name(name);
+    if (pp == NULL) {
+        gctl_error(req, "Unable to locate specified provider: %s", name);
+        return;
+    }
+
+    G_DEDUPE_DEBUG(1, "Using geom provider: %s, secsize:%i, mediasize:%lu", 
+        pp->name, pp->sectorsize, pp->mediasize);
+        
     /* 2 */
-    gp = g_new_geomf(mp, "%s", md->md_name);
+    gp = g_new_geomf(mp, "%s", md.md_name);
     
     sc = g_malloc(sizeof(*sc), M_WAITOK | M_ZERO);
     mtx_init(&sc->sc_lock, "gdedupe lock", NULL, MTX_DEF);
@@ -121,12 +152,12 @@ g_dedupe_create(struct g_class *mp, struct g_provider *pp,
         mtx_destroy(&sc->sc_lock);
         g_free(sc);
         g_destroy_geom(gp);
-        return(NULL);
+        return;
     }
     
     g_error_provider(newpp, 0);
-    printf("Device %s created.", gp->name);
-    return (gp);
+    G_DEDUPE_DEBUG(1, "Device %s created.", gp->name);
+    return;
 }
 
 static void
@@ -183,9 +214,12 @@ static void
 g_dedupe_config(struct gctl_req *req, struct g_class *cp,
    char const *verb)
 {
-    printf("g_dedupe_ctlreq: verb: %s\n", verb);
+    G_DEDUPE_DEBUG(1, "g_dedupe_ctlreq: verb: %s", verb);
     
-    /* TODO: handle create */
+    if(strcmp(verb, "create") == 0) {
+            g_dedupe_create(req, cp);
+            return;
+    }
 }
 
 static int

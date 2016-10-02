@@ -24,16 +24,21 @@
  * SUCH DAMAGE.
  */
  
-static g_ctl_req_t g_dedupe_config;
+#include <sys/endian.h>
+#define G_DEDUPE_MAGIC      "GEOM::DEDUPE"
+#define G_DEDUPE_VERSION    1
 
-struct g_dedupe_metadata {
-          char            md_magic[16];
-          uint32_t        md_version;
-          char            md_name[16];
-          uint64_t        md_provsize;
-};
-  
-
+#define G_DEDUPE_DEBUG(lvl, ...) do {                                    \
+        if (g_dedupe_debug >= (lvl)) {                                   \
+                printf("GEOM_DEDUPE");                                   \
+                if (g_dedupe_debug > 0)                                  \
+                        printf("[%u]", lvl);                            \
+                printf(": ");                                           \
+                printf(__VA_ARGS__);                                    \
+                printf("\n");                                           \
+        }                                                               \
+} while (0)
+       
 struct g_dedupe_softc {
         int             sc_error;
         off_t           sc_offset;
@@ -54,3 +59,26 @@ struct g_dedupe_softc {
         uintmax_t       sc_wrotebytes;
         struct mtx      sc_lock;
 };
+
+
+struct g_dedupe_metadata {
+          char            md_magic[16];
+          uint32_t        md_version;
+          char            md_name[16];
+};
+
+static __inline void
+concat_metadata_encode(const struct g_dedupe_metadata *md, u_char *data)
+{
+	bcopy(md->md_magic, data, sizeof(md->md_magic));
+	le32enc(data + 16, md->md_version);
+	bcopy(md->md_name, data + 20, sizeof(md->md_name));
+}
+
+static __inline void
+concat_metadata_decode(const u_char *data, struct g_dedupe_metadata *md)
+{
+	bcopy(data, md->md_magic, sizeof(md->md_magic));
+	md->md_version = le32dec(data + 16);
+	bcopy(data + 20, md->md_name, sizeof(md->md_name));
+}
