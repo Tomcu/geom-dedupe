@@ -1,0 +1,17 @@
+#!/usr/local/bin/bash
+
+for arch in ${ARCHS}; do \
+for DIST in ${DISTS}; do \
+for FILE in ${FILES}; do \
+	LDIR=${DISTDIR}/${arch}/${DIST}
+        LFILE=${LDIR}/${FILE}
+        JDIR=${JAILDIR}/${arch}/${DIST}
+	JNAME="$testjail-{arch}-${DIST}"
+	if [ ! -f ${JDIR} ] ; then
+		mkdir -p ${JDIR}
+		tar -xf ${LFILE} -C ${JDIR}
+        fi
+done
+done
+done
+

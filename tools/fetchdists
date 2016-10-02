@@ -1,0 +1,17 @@
+#!/usr/local/bin/bash
+echo "fetching dist files"
+
+for arch in ${ARCHS}; do \
+	for DIST in ${DISTS}; do \
+        for FILE in ${FILES}; do \
+                RFILE=${DISTSITE}/$arch/$arch/$DIST/$FILE
+                LDIR=${DISTDIR}/${arch}/${DIST}
+                LFILE=${LDIR}/${FILE}
+                if [ ! -f ${LFILE} ] ; then
+			mkdir -p ${LDIR}
+                	fetch -1 -o ${LFILE} ${RFILE}
+                fi
+        done
+        done
+        done
+
